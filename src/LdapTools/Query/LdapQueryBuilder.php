@@ -180,7 +180,7 @@ class LdapQueryBuilder
     public function from($type, $alias = null)
     {
         $type = $this->getSchemaFromType($type);
-        $this->operation->getFilter()->addLdapObjectSchema($type, $alias);
+        // $this->operation->getFilter()->addLdapObjectSchema($type, $alias);
         $this->hydrator->setLdapObjectSchema($type);
 
         return $this;
