@@ -79,7 +79,7 @@ class LdapUtilities
     public static function escapeValue($value, $ignore = null, $flags = null)
     {
         // If this is a hexadecimal escaped string, then do not escape it.
-        $value = preg_match('/^(\\\[0-9a-fA-F]{2})+$/', (string) $value) ? $value : ldap_escape($value, $ignore, $flags);
+        $value = preg_match('/^(\\\[0-9a-fA-F]{2})+$/', (string) $value) ? $value : ldap_escape((string) $value, (string) $ignore, (int) $flags);
 
         // Per RFC 4514, leading/trailing spaces should be encoded in DNs, as well as carriage returns.
         if ((int)$flags & LDAP_ESCAPE_DN) {

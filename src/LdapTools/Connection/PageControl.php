@@ -101,7 +101,7 @@ class PageControl
         if ($this->sizeLimit && ($this->resultNumber + $this->pageSize) > $this->sizeLimit) {
             $this->pageSize = $this->sizeLimit - $this->resultNumber;
         }
-        if (!@ldap_control_paged_result($this->connection->getResource(), $this->pageSize, false, $this->cookie)) {
+        if (!$this->setPagedResultControl($this->pageSize)) {
             throw new LdapConnectionException(sprintf(
                 'Unable to enable paged results (%s): %s',
                 $this->connection->getLastErrorNumber(),
@@ -122,11 +122,16 @@ class PageControl
             return;
         }
         $this->resultNumber += $this->pageSize;
-        if (!@ldap_control_paged_result_response($this->connection->getResource(), $result, $this->cookie)) {
+        // ldap_control_paged_result_response() was removed in PHP 8: the cookie is read from the response controls.
+        $errorCode = $matchedDn = $errorMessage = $referrals = $controls = null;
+        if (!@ldap_parse_result($this->connection->getResource(), $result, $errorCode, $matchedDn, $errorMessage, $referrals, $controls)) {
             throw new LdapConnectionException(
                 sprintf('Unable to set paged results response: %s', $this->connection->getLastError())
             );
         }
+        $this->cookie = isset($controls[LDAP_CONTROL_PAGEDRESULTS]['value']['cookie'])
+            ? $controls[LDAP_CONTROL_PAGEDRESULTS]['value']['cookie']
+            : '';
     }
 
     /**
@@ -138,12 +143,27 @@ class PageControl
     {
         // Per RFC 2696, to abandon a paged search you should send a size of 0 along with the cookie used in the search.
         // However, testing this it doesn't seem to completely work. Perhaps a PHP bug?
-        if (!@ldap_control_paged_result($this->connection->getResource(), 0, false, $this->cookie)) {
+        if (!@ldap_set_option($this->connection->getResource(), LDAP_OPT_SERVER_CONTROLS, [])) {
             throw new LdapConnectionException(sprintf(
                 'Unable to reset paged results control for read operation: %s',
                 $this->connection->getLastError()
             ));
         }
+    }
+
+    /**
+     * Sets the paged results control on the connection (replaces ldap_control_paged_result(), removed in PHP 8).
+     *
+     * @param int $pageSize
+     * @return bool
+     */
+    protected function setPagedResultControl($pageSize)
+    {
+        return @ldap_set_option($this->connection->getResource(), LDAP_OPT_SERVER_CONTROLS, [[
+            'oid' => LDAP_CONTROL_PAGEDRESULTS,
+            'iscritical' => false,
+            'value' => ['size' => $pageSize, 'cookie' => (string) $this->cookie],
+        ]]);
     }
 
     /**
